@@ -85,11 +85,12 @@ WSGI_APPLICATION = 'backend_medconnect.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'medconnect_db',
-        'USER': 'postgres',
-        'PASSWORD': '12345',
-        'HOST': 'localhost',
-        'PORT': '5433',
+        'NAME': 'neondb',  # From your .env file
+        'USER': 'neondb_owner',
+        'PASSWORD': 'npg_mLnQDMV20pbf',
+        'HOST': 'ep-aged-firefly-a4ok1f33-pooler.us-east-1.aws.neon.tech',
+        'PORT': '5432',  # <-- Corrected Port
+        'OPTIONS': {'sslmode': 'require'},  # <-- Crucial SSL option
     }
 }
 
