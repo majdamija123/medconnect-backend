@@ -26,23 +26,24 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key-only-for-local')
 DEBUG = os.getenv('DEBUG', 'True').lower() in ['true', '1', 'yes']
 
 # Hosts autorisés (séparés par des virgules dans le .env)
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,192.168.0.139',).split(',')
 
 
 # ===== CONFIGURATION DES APPLICATIONS =====
 
 INSTALLED_APPS = [
+    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework.authtoken', 
+    'corsheaders',
     
     # Votre app DOIT venir avant admin
     'app',
-    
-    'django.contrib.admin',
 ]
 
 # Ceci est CRUCIAL car vous utilisez un modèle User personnalisé
@@ -52,6 +53,7 @@ AUTH_USER_MODEL = "app.User"
 # ===== MIDDLEWARE =====
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -138,10 +140,28 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+    ],
 }
+
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:3000",
+    "http://192.168.0.159:8000",
+]
+
+CORS_ALLOW_ALL_ORIGINS = True
+
+REST_FRAMEWORK_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 jours

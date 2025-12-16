@@ -1,13 +1,19 @@
-# app/serializers.py
 from rest_framework import serializers
-from .models import User
+from django.contrib.auth import authenticate
+from django.contrib.auth.password_validation import validate_password
+from .models import User, PatientProfile, DoctorProfile
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = User
-        fields = ["id","username","email","first_name","last_name","phone","role","password","is_active"]
+        fields = ["id", "username", "email", "first_name", "last_name", 
+                 "phone", "role", "password", "is_active", "date_of_birth", "address"]
+        extra_kwargs = {
+            'password': {'write_only': True},
+            'is_active': {'read_only': True}
+        }
 
     def create(self, validated_data):
         password = validated_data.pop("password", None)
@@ -24,3 +30,116 @@ class UserSerializer(serializers.ModelSerializer):
             user.set_password(password)
             user.save()
         return user
+
+class PatientProfileSerializer(serializers.ModelSerializer):
+    user = UserSerializer()
+
+    class Meta:
+        model = PatientProfile
+        fields = ['id', 'user', 'blood_type', 'allergies', 
+                 'emergency_contact', 'emergency_phone']
+        read_only_fields = ['id']
+
+    def create(self, validated_data):
+        user_data = validated_data.pop('user')
+        password = user_data.pop('password', None)
+        
+        # Créer l'utilisateur
+        user = User.objects.create(**user_data)
+        if password:
+            user.set_password(password)
+            user.save()
+        
+        # Créer le profil patient
+        patient_profile = PatientProfile.objects.create(user=user, **validated_data)
+        return patient_profile
+
+class DoctorProfileSerializer(serializers.ModelSerializer):
+    user = UserSerializer()
+
+    class Meta:
+        model = DoctorProfile
+        fields = ['id', 'user', 'speciality', 'license_number', 
+                 'years_of_experience', 'consultation_fee', 
+                 'is_available', 'bio']
+        read_only_fields = ['id']
+
+# Serializers pour l'authentification
+class RegisterPatientSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150, required=True)
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(write_only=True, required=True)
+    first_name = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    blood_type = serializers.CharField(max_length=10, required=False, allow_blank=True)
+    allergies = serializers.CharField(required=False, allow_blank=True)
+    emergency_contact = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    emergency_phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
+
+    def validate_password(self, value):
+        validate_password(value)
+        return value
+
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Cet email est déjà utilisé.")
+        return value
+
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("Ce nom d'utilisateur est déjà pris.")
+        return value
+
+    def create(self, validated_data):
+        # Extraire les données du patient
+        blood_type = validated_data.pop('blood_type', '')
+        allergies = validated_data.pop('allergies', '')
+        emergency_contact = validated_data.pop('emergency_contact', '')
+        emergency_phone = validated_data.pop('emergency_phone', '')
+        
+        # Créer l'utilisateur
+        password = validated_data.pop('password')
+        user = User.objects.create(
+            **validated_data,
+            role=User.Roles.PATIENT,
+            is_active=True
+        )
+        user.set_password(password)
+        user.save()
+        
+        # Créer le profil patient
+        patient_profile = PatientProfile.objects.create(
+            user=user,
+            blood_type=blood_type or None,
+            allergies=allergies or None,
+            emergency_contact=emergency_contact or None,
+            emergency_phone=emergency_phone or None
+        )
+        
+        return patient_profile
+
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(write_only=True, required=True)
+
+    def validate(self, data):
+        email = data.get('email')
+        password = data.get('password')
+        
+        # Trouver l'utilisateur par email
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Identifiants incorrects.")
+        
+        # Vérifier le mot de passe
+        if not user.check_password(password):
+            raise serializers.ValidationError("Identifiants incorrects.")
+        
+        # Vérifier si l'utilisateur est actif
+        if not user.is_active:
+            raise serializers.ValidationError("Ce compte est désactivé.")
+        
+        data['user'] = user
+        return data
