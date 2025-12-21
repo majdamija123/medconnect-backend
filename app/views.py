@@ -9,7 +9,7 @@ from django.db import transaction
 from .models import User, PatientProfile, DoctorProfile
 from .serializers import (
     UserSerializer, PatientProfileSerializer, DoctorProfileSerializer,
-    RegisterPatientSerializer, LoginSerializer
+    RegisterPatientSerializer, LoginSerializer, PatientDashboardSerializer
 )
 from .permissions import IsAgentOrSuperAdmin
 
@@ -124,3 +124,21 @@ class PatientViewSet(viewsets.ModelViewSet):
         if self.action == 'create':
             return [AllowAny()]
         return super().get_permissions()
+
+from rest_framework.views import APIView
+
+class PatientDashboardView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        
+        # Vérifier si l'utilisateur est un patient
+        if not user.is_patient():
+            return Response(
+                {"error": "Accès réservé aux patients."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
+        serializer = PatientDashboardSerializer(user)
+        return Response(serializer.data)

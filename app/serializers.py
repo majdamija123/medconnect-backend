@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
-from .models import User, PatientProfile, DoctorProfile
+from .models import User, PatientProfile, DoctorProfile, Appointment, Notification
+from django.utils import timezone
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
@@ -143,3 +144,63 @@ class LoginSerializer(serializers.Serializer):
         
         data['user'] = user
         return data
+
+class AppointmentSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.CharField(source='doctor.user.get_full_name', read_only=True)
+    specialty = serializers.CharField(source='doctor.speciality.name', read_only=True)
+
+    class Meta:
+        model = Appointment
+        fields = ['id', 'doctor_name', 'specialty', 'date', 'status']
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ['id', 'title', 'message', 'date', 'type']
+
+class PatientDashboardSerializer(serializers.Serializer):
+    user_info = serializers.SerializerMethodField()
+    patient_profile = serializers.SerializerMethodField()
+    next_appointment = serializers.SerializerMethodField()
+    unread_messages_count = serializers.IntegerField(default=0) # Placeholder logic
+    new_documents_count = serializers.IntegerField(default=0)   # Placeholder logic
+    recent_notifications = serializers.SerializerMethodField()
+
+    def get_user_info(self, obj):
+        # obj is the user instance
+        return {
+            "first_name": obj.first_name,
+            "last_name": obj.last_name,
+            "email": obj.email,
+            "phone": obj.phone
+        }
+
+    def get_patient_profile(self, obj):
+        try:
+            profile = obj.patientprofile
+            return {
+                "blood_type": profile.blood_type,
+                "allergies": profile.allergies,
+                "emergency_contact": profile.emergency_contact,
+                "emergency_phone": profile.emergency_phone
+            }
+        except PatientProfile.DoesNotExist:
+            return None
+
+    def get_next_appointment(self, obj):
+        try:
+            profile = obj.patientprofile
+            next_appt = Appointment.objects.filter(
+                patient=profile, 
+                date__gte=timezone.now(),
+                status__in=['PENDING', 'CONFIRMED']
+            ).order_by('date').first()
+            if next_appt:
+                return AppointmentSerializer(next_appt).data
+            return None
+        except PatientProfile.DoesNotExist:
+            return None
+
+    def get_recent_notifications(self, obj):
+        notifications = Notification.objects.filter(user=obj).order_by('-date')[:5]
+        return NotificationSerializer(notifications, many=True).data

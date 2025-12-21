@@ -78,3 +78,51 @@ class MedicalRecord(models.Model):
     
     def __str__(self):
         return f"{self.title} - {self.patient.user.get_full_name()}"
+
+# Modèle pour les rendez-vous
+class Appointment(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'En attente'),
+        ('CONFIRMED', 'Confirmé'),
+        ('CANCELLED', 'Annulé'),
+        ('COMPLETED', 'Terminé'),
+    ]
+
+    patient = models.ForeignKey(PatientProfile, on_delete=models.CASCADE, related_name='appointments')
+    doctor = models.ForeignKey(DoctorProfile, on_delete=models.CASCADE, related_name='appointments')
+    date = models.DateTimeField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    reason = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['date']
+
+    def __str__(self):
+        return f"RDV {self.patient.user.get_full_name()} avec {self.doctor.user.get_full_name()} le {self.date}"
+
+# Modèle pour les notifications
+class Notification(models.Model):
+    TYPE_CHOICES = [
+        ('INFO', 'Information'),
+        ('WARNING', 'Avertissement'),
+        ('SUCCESS', 'Succès'),
+        ('ERROR', 'Erreur'),
+        ('APPOINTMENT', 'Rendez-vous'),
+        ('MESSAGE', 'Message'),
+        ('DOCUMENT', 'Document'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    title = models.CharField(max_length=200)
+    message = models.TextField()
+    date = models.DateTimeField(default=timezone.now)
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='INFO')
+    is_read = models.BooleanField(default=False)
+    
+    class Meta:
+        ordering = ['-date']
+
+    def __str__(self):
+        return f"{self.title} - {self.user.username}"
