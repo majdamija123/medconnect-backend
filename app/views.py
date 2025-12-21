@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate, login, logout
 from django.db import transaction
+from datetime import datetime
 
 from .models import User, PatientProfile, DoctorProfile
 from .serializers import (
@@ -142,3 +143,73 @@ class PatientDashboardView(APIView):
             
         serializer = PatientDashboardSerializer(user)
         return Response(serializer.data)
+
+class DoctorViewSet(viewsets.ModelViewSet):
+    queryset = DoctorProfile.objects.all()
+    serializer_class = DoctorProfileSerializer
+    permission_classes = [IsAuthenticated]
+    
+    @action(detail=True, methods=['get'])
+    def availability(self, request, pk=None):
+        """
+        Retourne les créneaux disponibles pour une date donnée.
+        Query param: date (YYYY-MM-DD)
+        """
+        doctor = self.get_object()
+        date_str = request.query_params.get('date')
+        
+        if not date_str:
+            return Response({"error": "Date param required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return Response({"error": "Invalid date format"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        from .services import AppointmentValidationService
+        slots = AppointmentValidationService.get_available_slots(doctor, target_date)
+        
+        return Response({
+            "doctor": doctor.user.get_full_name(),
+            "date": str(target_date),
+            "slots": [slot.strftime("%H:%M") for slot in slots]
+        })
+
+from .serializers import AppointmentSerializer, CreateAppointmentSerializer
+from .models import Appointment
+
+class AppointmentViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return CreateAppointmentSerializer
+        return AppointmentSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_patient():
+            return Appointment.objects.filter(patient__user=user)
+        elif user.is_doctor():
+            return Appointment.objects.filter(doctor__user=user)
+        return Appointment.objects.none()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.is_patient():
+            serializer.save(patient=user.patientprofile)
+        else:
+            # Pour l'instant on empêche les médecins de créer des RDV pour eux-mêmes via cette API
+            # ou on pourrait implémenter une logique différente
+            raise serializers.ValidationError("Seuls les patients peuvent prendre rendez-vous pour le moment.")
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        
+        # Utiliser le serializer de lecture pour la réponse
+        read_serializer = AppointmentSerializer(serializer.instance)
+        headers = self.get_success_headers(read_serializer.data)
+        return Response(read_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+

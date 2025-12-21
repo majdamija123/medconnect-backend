@@ -57,10 +57,11 @@ class PatientProfileSerializer(serializers.ModelSerializer):
 
 class DoctorProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer()
+    speciality_name = serializers.CharField(source='speciality.name', read_only=True)
 
     class Meta:
         model = DoctorProfile
-        fields = ['id', 'user', 'speciality', 'license_number', 
+        fields = ['id', 'user', 'speciality', 'speciality_name', 'license_number', 
                  'years_of_experience', 'consultation_fee', 
                  'is_available', 'bio']
         read_only_fields = ['id']
@@ -147,11 +148,44 @@ class LoginSerializer(serializers.Serializer):
 
 class AppointmentSerializer(serializers.ModelSerializer):
     doctor_name = serializers.CharField(source='doctor.user.get_full_name', read_only=True)
+    patient_name = serializers.CharField(source='patient.user.get_full_name', read_only=True)
     specialty = serializers.CharField(source='doctor.speciality.name', read_only=True)
 
     class Meta:
         model = Appointment
-        fields = ['id', 'doctor_name', 'specialty', 'date', 'status']
+        fields = [
+            'id', 'doctor', 'patient', 'doctor_name', 'patient_name', 
+            'specialty', 'date', 'duration', 'status', 'reason', 
+            'notes_patient', 'created_at'
+        ]
+        read_only_fields = ['id', 'doctor', 'patient', 'status', 'created_at', 'notes_patient']
+
+class CreateAppointmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Appointment
+        fields = ['doctor', 'date', 'reason']
+
+    def validate(self, data):
+        from .services import AppointmentValidationService
+        
+        doctor = data['doctor']
+        date = data['date']
+        
+        # Validation 1: Date dans le futur
+        is_valid_time, message = AppointmentValidationService.validate_appointment_retention(date)
+        if not is_valid_time:
+            raise serializers.ValidationError(message)
+
+        # Validation 2: Disponibilité (chevauchement)
+        if not AppointmentValidationService.is_slot_available(doctor, date):
+            raise serializers.ValidationError("Ce créneau n'est pas disponible.")
+            
+        return data
+
+    def create(self, validated_data):
+        # Le patient est ajouté dans la vue via perform_create
+        return super().create(validated_data)
+
 
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:

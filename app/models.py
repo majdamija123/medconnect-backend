@@ -91,13 +91,16 @@ class Appointment(models.Model):
     patient = models.ForeignKey(PatientProfile, on_delete=models.CASCADE, related_name='appointments')
     doctor = models.ForeignKey(DoctorProfile, on_delete=models.CASCADE, related_name='appointments')
     date = models.DateTimeField()
+    duration = models.IntegerField(default=30, help_text="Durée en minutes")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     reason = models.TextField(blank=True, null=True)
+    notes_patient = models.TextField(blank=True, null=True, help_text="Notes visibles par le patient")
+    notes_doctor = models.TextField(blank=True, null=True, help_text="Notes privées du médecin")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['date']
+        ordering = ['-date']
 
     def __str__(self):
         return f"RDV {self.patient.user.get_full_name()} avec {self.doctor.user.get_full_name()} le {self.date}"
@@ -126,3 +129,35 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.title} - {self.user.username}"
+
+# Modèle pour les créneaux de disponibilité
+class AvailabilitySlot(models.Model):
+    DAYS_OF_WEEK = [
+        (0, 'Lundi'), (1, 'Mardi'), (2, 'Mercredi'), 
+        (3, 'Jeudi'), (4, 'Vendredi'), (5, 'Samedi'), (6, 'Dimanche'),
+    ]
+
+    doctor = models.ForeignKey(DoctorProfile, on_delete=models.CASCADE, related_name='availability_slots')
+    day_of_week = models.IntegerField(choices=DAYS_OF_WEEK)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    is_recurring = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['day_of_week', 'start_time']
+
+    def __str__(self):
+        return f"{self.doctor} - {self.get_day_of_week_display()} {self.start_time}-{self.end_time}"
+
+# Modèle pour les jours fériés / Absences
+class Holiday(models.Model):
+    doctor = models.ForeignKey(DoctorProfile, on_delete=models.CASCADE, related_name='holidays')
+    date = models.DateField()
+    reason = models.CharField(max_length=200, blank=True, null=True)
+
+    class Meta:
+        ordering = ['date']
+        unique_together = ('doctor', 'date')
+
+    def __str__(self):
+        return f"Absence {self.doctor} le {self.date}"
