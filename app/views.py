@@ -144,6 +144,41 @@ class PatientDashboardView(APIView):
         serializer = PatientDashboardSerializer(user)
         return Response(serializer.data)
 
+class PatientProfileView(APIView):
+    """
+    Vue pour récupérer et modifier le profil du patient connecté.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        user = request.user
+        if not user.is_patient():
+            return Response({"error": "Accès réservé aux patients."}, status=status.HTTP_403_FORBIDDEN)
+            
+        try:
+            profile = user.patientprofile
+        except PatientProfile.DoesNotExist:
+            return Response({"error": "Profil introuvable."}, status=status.HTTP_404_NOT_FOUND)
+            
+        serializer = PatientProfileSerializer(profile)
+        return Response(serializer.data)
+        
+    def put(self, request):
+        user = request.user
+        if not user.is_patient():
+            return Response({"error": "Accès réservé aux patients."}, status=status.HTTP_403_FORBIDDEN)
+            
+        try:
+            profile = user.patientprofile
+        except PatientProfile.DoesNotExist:
+            return Response({"error": "Profil introuvable."}, status=status.HTTP_404_NOT_FOUND)
+            
+        serializer = PatientProfileSerializer(profile, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 class DoctorViewSet(viewsets.ModelViewSet):
     queryset = DoctorProfile.objects.all()
     serializer_class = DoctorProfileSerializer
@@ -212,4 +247,3 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         read_serializer = AppointmentSerializer(serializer.instance)
         headers = self.get_success_headers(read_serializer.data)
         return Response(read_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-

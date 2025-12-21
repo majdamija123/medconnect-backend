@@ -38,7 +38,7 @@ class PatientProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = PatientProfile
         fields = ['id', 'user', 'blood_type', 'allergies', 
-                 'emergency_contact', 'emergency_phone']
+                 'emergency_contact', 'emergency_phone', 'height', 'weight']
         read_only_fields = ['id']
 
     def create(self, validated_data):

@@ -26,7 +26,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key-only-for-local')
 DEBUG = os.getenv('DEBUG', 'True').lower() in ['true', '1', 'yes']
 
 # Hosts autorisés (séparés par des virgules dans le .env)
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,192.168.0.159',).split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,192.168.0.159,192.168.0.139',).split(',')
 
 
 # ===== CONFIGURATION DES APPLICATIONS =====
@@ -160,6 +160,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",
     "http://localhost:3000",
     "http://192.168.0.159:8000",
+    "http://192.168.0.139:8000",
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True

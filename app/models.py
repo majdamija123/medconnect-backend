@@ -57,6 +57,8 @@ class PatientProfile(models.Model):
     allergies = models.TextField(blank=True, null=True)
     emergency_contact = models.CharField(max_length=100, blank=True, null=True)
     emergency_phone = models.CharField(max_length=20, blank=True, null=True)
+    height = models.FloatField(null=True, blank=True, help_text="Taille en cm")
+    weight = models.FloatField(null=True, blank=True, help_text="Poids en kg")
     
     def __str__(self):
         return f"Patient: {self.user.get_full_name()}"
