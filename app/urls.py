@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     AuthViewSet, UserAdminViewSet, PatientViewSet, AppointmentViewSet, 
     PatientDashboardView, DoctorViewSet, PatientProfileView, 
-    MedicalDocumentViewSet, MedicalRecordAggregatedViewSet  # Ajout ici
+    MedicalDocumentViewSet, MedicalRecordAggregatedViewSet, ChangePasswordView  # Ajout ici
 )
 
 router = DefaultRouter()
@@ -19,5 +19,6 @@ urlpatterns = [
     path('api/', include(router.urls)),
     path('api/patient/dashboard/', PatientDashboardView.as_view(), name='patient-dashboard'),
     path('api/patient/profile/', PatientProfileView.as_view(), name='patient-profile'),
+    path('api/auth/password/change/', ChangePasswordView.as_view(), name='change-password'),
     path('api-auth/', include('rest_framework.urls')),
 ]

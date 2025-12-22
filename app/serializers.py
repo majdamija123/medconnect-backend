@@ -42,19 +42,32 @@ class PatientProfileSerializer(serializers.ModelSerializer):
                  'emergency_contact', 'emergency_phone', 'height', 'weight']
         read_only_fields = ['id']
 
-    def create(self, validated_data):
-        user_data = validated_data.pop('user')
-        password = user_data.pop('password', None)
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', {})
         
-        # Créer l'utilisateur
-        user = User.objects.create(**user_data)
-        if password:
-            user.set_password(password)
-            user.save()
+        # Mettre à jour les champs du profil patient
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
         
-        # Créer le profil patient
-        patient_profile = PatientProfile.objects.create(user=user, **validated_data)
-        return patient_profile
+        # Mettre à jour les champs de l'utilisateur associé
+        user = instance.user
+        for attr, value in user_data.items():
+            setattr(user, attr, value)
+        user.save()
+        
+        return instance
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True)
+    confirm_password = serializers.CharField(required=True)
+
+    def validate(self, data):
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError({"confirm_password": ["Les mots de passe ne correspondent pas."]})
+        validate_password(data['new_password'])
+        return data
 
 class DoctorProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer()

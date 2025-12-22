@@ -12,7 +12,7 @@ from .serializers import (
     UserSerializer, PatientProfileSerializer, DoctorProfileSerializer,
     RegisterPatientSerializer, LoginSerializer, PatientDashboardSerializer,
     MedicalDocumentSerializer, AggregatedMedicalRecordSerializer,
-    AppointmentSerializer
+    AppointmentSerializer, ChangePasswordSerializer
 )
 from .permissions import IsAgentOrSuperAdmin
 
@@ -373,3 +373,24 @@ class MedicalRecordAggregatedViewSet(viewsets.ViewSet):
             return Response(serializer.data)
         except PatientProfile.DoesNotExist:
             return Response({"error": "Profil patient introuvable."}, status=404)
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            user = request.user
+            if not user.check_password(serializer.data.get("old_password")):
+                return Response(
+                    {"old_password": ["Ancien mot de passe incorrect."]}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            user.set_password(serializer.data.get("new_password"))
+            user.save()
+            return Response(
+                {"message": "Mot de passe modifié avec succès."}, 
+                status=status.HTTP_200_OK
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
