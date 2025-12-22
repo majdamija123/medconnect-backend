@@ -93,6 +93,9 @@ class RegisterPatientSerializer(serializers.Serializer):
     emergency_contact = serializers.CharField(max_length=100, required=False, allow_blank=True)
     emergency_phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
 
+    date_of_birth = serializers.DateField(required=False, allow_null=True)
+    address = serializers.CharField(required=False, allow_blank=True)
+
     def validate_password(self, value):
         validate_password(value)
         return value
