@@ -269,3 +269,30 @@ class PatientDashboardSerializer(serializers.Serializer):
     def get_recent_notifications(self, obj):
         notifications = Notification.objects.filter(user=obj).order_by('-date')[:5]
         return NotificationSerializer(notifications, many=True).data
+
+class AggregatedMedicalRecordSerializer(serializers.Serializer):
+    patient_info = serializers.SerializerMethodField()
+    consultations = serializers.SerializerMethodField()
+    documents = serializers.SerializerMethodField()
+
+    def get_patient_info(self, obj):
+        # obj is the PatientProfile instance
+        return {
+            "full_name": obj.user.get_full_name(),
+            "blood_type": obj.blood_type,
+            "allergies": obj.allergies,
+            "height": obj.height,
+            "weight": obj.weight,
+            "emergency_contact": obj.emergency_contact,
+            "emergency_phone": obj.emergency_phone
+        }
+
+    def get_consultations(self, obj):
+        # Récupérer les rendez-vous terminés
+        appts = Appointment.objects.filter(patient=obj, status='COMPLETED').order_by('-date')
+        return AppointmentSerializer(appts, many=True).data
+
+    def get_documents(self, obj):
+        # Récupérer tous les documents
+        docs = MedicalDocument.objects.filter(patient=obj).order_by('-created_at')
+        return MedicalDocumentSerializer(docs, many=True, context=self.context).data

@@ -2,7 +2,8 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     AuthViewSet, UserAdminViewSet, PatientViewSet, AppointmentViewSet, 
-    PatientDashboardView, DoctorViewSet, PatientProfileView, MedicalDocumentViewSet
+    PatientDashboardView, DoctorViewSet, PatientProfileView, 
+    MedicalDocumentViewSet, MedicalRecordAggregatedViewSet  # Ajout ici
 )
 
 router = DefaultRouter()
@@ -12,6 +13,7 @@ router.register(r'patients', PatientViewSet, basename='patient')
 router.register(r'doctors', DoctorViewSet, basename='doctor')
 router.register(r'appointments', AppointmentViewSet, basename='appointment')
 router.register(r'patient/documents', MedicalDocumentViewSet, basename='patient-documents')
+router.register(r'patient/medical-record', MedicalRecordAggregatedViewSet, basename='patient-medical-record')
 
 urlpatterns = [
     path('api/', include(router.urls)),

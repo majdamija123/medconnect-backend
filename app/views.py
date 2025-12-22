@@ -7,11 +7,12 @@ from django.contrib.auth import authenticate, login, logout
 from django.db import transaction
 from datetime import datetime
 
-from .models import User, PatientProfile, DoctorProfile, MedicalDocument
+from .models import User, PatientProfile, DoctorProfile, MedicalDocument, Appointment
 from .serializers import (
     UserSerializer, PatientProfileSerializer, DoctorProfileSerializer,
     RegisterPatientSerializer, LoginSerializer, PatientDashboardSerializer,
-    MedicalDocumentSerializer
+    MedicalDocumentSerializer, AggregatedMedicalRecordSerializer,
+    AppointmentSerializer
 )
 from .permissions import IsAgentOrSuperAdmin
 
@@ -318,3 +319,18 @@ class MedicalDocumentViewSet(viewsets.ModelViewSet):
                 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class MedicalRecordAggregatedViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request):
+        user = request.user
+        if not user.is_patient():
+            return Response({"error": "Seuls les patients peuvent consulter leur dossier médical."}, status=403)
+        
+        try:
+            profile = user.patientprofile
+            serializer = AggregatedMedicalRecordSerializer(profile, context={'request': request})
+            return Response(serializer.data)
+        except PatientProfile.DoesNotExist:
+            return Response({"error": "Profil patient introuvable."}, status=404)
