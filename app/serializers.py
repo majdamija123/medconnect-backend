@@ -218,7 +218,7 @@ class PatientDashboardSerializer(serializers.Serializer):
     user_info = serializers.SerializerMethodField()
     patient_profile = serializers.SerializerMethodField()
     next_appointment = serializers.SerializerMethodField()
-    unread_messages_count = serializers.IntegerField(default=0) # Placeholder logic
+    unread_messages_count = serializers.IntegerField(default=0) 
     new_documents_count = serializers.SerializerMethodField()
     recent_notifications = serializers.SerializerMethodField()
 
@@ -260,8 +260,7 @@ class PatientDashboardSerializer(serializers.Serializer):
     def get_new_documents_count(self, obj):
         try:
             profile = obj.patientprofile
-            # Logic for "new" documents: e.g., created in the last 7 days and not seen (if we had a seen status)
-            # For now, let's just count documents from the last 7 days
+
             week_ago = timezone.now() - timezone.timedelta(days=7)
             return MedicalDocument.objects.filter(patient=profile, created_at__gte=week_ago).count()
         except PatientProfile.DoesNotExist:

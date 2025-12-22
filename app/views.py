@@ -263,7 +263,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
         # Validation: 24h avant
         # On compare avec l'heure actuelle (timezone aware)
-        now = timezone.now()  # <-- timezone est maintenant importé
+        now = timezone.now()  
         
         # Calcul de la différence
         time_diff = appointment.date - now
@@ -281,7 +281,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             appointment.save()
             
             # Notification au médecin
-            Notification.objects.create(  # <-- Notification est maintenant importé
+            Notification.objects.create( 
                 user=appointment.doctor.user,
                 title="Annulation de rendez-vous",
                 message=f"Le patient {appointment.patient.user.get_full_name()} a annulé son rendez-vous du {appointment.date.strftime('%d/%m/%Y à %H:%M')}.",
@@ -305,9 +305,7 @@ class MedicalDocumentViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ['update', 'partial_update', 'destroy']:
-            # Requirement: patient cannot modify/delete
-            # You might want to allow doctors to modify their own issued documents
-            # For now, let's stick to the simplest restriction
+         
             return [IsAuthenticated()]
         return super().get_permissions()
 
