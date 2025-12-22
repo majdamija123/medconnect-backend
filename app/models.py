@@ -161,5 +161,29 @@ class Holiday(models.Model):
         ordering = ['date']
         unique_together = ('doctor', 'date')
 
+# Modèle pour les documents médicaux
+class MedicalDocument(models.Model):
+    class DocumentType(models.TextChoices):
+        ORDONNANCE = "ORDONNANCE", "Ordonnance"
+        ANALYSE = "ANALYSE", "Analyse"
+        AUTRE = "AUTRE", "Autre"
+
+    class UploadedBy(models.TextChoices):
+        DOCTOR = "DOCTOR", "Médecin"
+        PATIENT = "PATIENT", "Patient"
+
+    patient = models.ForeignKey(PatientProfile, on_delete=models.CASCADE, related_name='medical_documents')
+    doctor = models.ForeignKey(DoctorProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name='issued_documents')
+    title = models.CharField(max_length=200)
+    document_type = models.CharField(max_length=20, choices=DocumentType.choices, default=DocumentType.AUTRE)
+    file = models.FileField(upload_to='medical_documents/')
+    description = models.TextField(blank=True, null=True)
+    uploaded_by = models.CharField(max_length=10, choices=UploadedBy.choices, default=UploadedBy.DOCTOR)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
     def __str__(self):
-        return f"Absence {self.doctor} le {self.date}"
+        return f"{self.title} - {self.patient.user.get_full_name()}"

@@ -7,10 +7,11 @@ from django.contrib.auth import authenticate, login, logout
 from django.db import transaction
 from datetime import datetime
 
-from .models import User, PatientProfile, DoctorProfile
+from .models import User, PatientProfile, DoctorProfile, MedicalDocument
 from .serializers import (
     UserSerializer, PatientProfileSerializer, DoctorProfileSerializer,
-    RegisterPatientSerializer, LoginSerializer, PatientDashboardSerializer
+    RegisterPatientSerializer, LoginSerializer, PatientDashboardSerializer,
+    MedicalDocumentSerializer
 )
 from .permissions import IsAgentOrSuperAdmin
 
@@ -247,3 +248,73 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         read_serializer = AppointmentSerializer(serializer.instance)
         headers = self.get_success_headers(read_serializer.data)
         return Response(read_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+class MedicalDocumentViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = MedicalDocumentSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_patient():
+            return MedicalDocument.objects.filter(patient__user=user)
+        elif user.is_doctor():
+            return MedicalDocument.objects.filter(doctor__user=user)
+        return MedicalDocument.objects.none()
+
+    def get_permissions(self):
+        if self.action in ['update', 'partial_update', 'destroy']:
+            # Requirement: patient cannot modify/delete
+            # You might want to allow doctors to modify their own issued documents
+            # For now, let's stick to the simplest restriction
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        if self.action in ['update', 'partial_update', 'destroy'] and request.user.is_patient():
+            self.permission_denied(request, message="Les patients ne peuvent pas modifier ou supprimer des documents.")
+
+    @action(detail=False, methods=['post'], url_path='upload')
+    def upload(self, request):
+        user = request.user
+        
+        # Validation file size (10MB)
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({"error": "Aucun fichier fourni"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if file_obj.size > 10 * 1024 * 1024:
+            return Response({"error": "Fichier trop volumineux (max 10MB)"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validation extension
+        ext = file_obj.name.split('.')[-1].lower()
+        if ext not in ['pdf', 'jpg', 'jpeg', 'png']:
+            return Response({"error": "Type de fichier non supporté (PDF, JPG, PNG uniquement)"}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            if user.is_patient():
+                serializer.save(
+                    patient=user.patientprofile,
+                    uploaded_by=MedicalDocument.UploadedBy.PATIENT
+                )
+            elif user.is_doctor():
+                # If doctor, need to provide patient ID
+                patient_id = request.data.get('patient')
+                if not patient_id:
+                    return Response({"error": "ID du patient requis pour l'upload par un médecin"}, status=status.HTTP_400_BAD_REQUEST)
+                try:
+                    patient = PatientProfile.objects.get(id=patient_id)
+                except PatientProfile.DoesNotExist:
+                    return Response({"error": "Patient non trouvé"}, status=status.HTTP_404_NOT_FOUND)
+                
+                serializer.save(
+                    patient=patient,
+                    doctor=user.doctorprofile,
+                    uploaded_by=MedicalDocument.UploadedBy.DOCTOR
+                )
+            else:
+                return Response({"error": "Action non autorisée"}, status=status.HTTP_403_FORBIDDEN)
+                
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

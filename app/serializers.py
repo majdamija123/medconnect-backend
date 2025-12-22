@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
-from .models import User, PatientProfile, DoctorProfile, Appointment, Notification
+from .models import User, PatientProfile, DoctorProfile, Appointment, Notification, MedicalDocument
 from django.utils import timezone
 
 class UserSerializer(serializers.ModelSerializer):
@@ -160,6 +160,27 @@ class AppointmentSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'doctor', 'patient', 'status', 'created_at', 'notes_patient']
 
+class MedicalDocumentSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.CharField(source='doctor.user.get_full_name', read_only=True, allow_null=True)
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MedicalDocument
+        fields = [
+            'id', 'title', 'document_type', 'description', 
+            'file', 'file_url', 'doctor', 'doctor_name', 
+            'uploaded_by', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'doctor_name', 'file_url']
+
+    def get_file_url(self, obj):
+        if obj.file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.file.url)
+            return obj.file.url
+        return None
+
 class CreateAppointmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Appointment
@@ -197,7 +218,7 @@ class PatientDashboardSerializer(serializers.Serializer):
     patient_profile = serializers.SerializerMethodField()
     next_appointment = serializers.SerializerMethodField()
     unread_messages_count = serializers.IntegerField(default=0) # Placeholder logic
-    new_documents_count = serializers.IntegerField(default=0)   # Placeholder logic
+    new_documents_count = serializers.SerializerMethodField()
     recent_notifications = serializers.SerializerMethodField()
 
     def get_user_info(self, obj):
@@ -234,6 +255,16 @@ class PatientDashboardSerializer(serializers.Serializer):
             return None
         except PatientProfile.DoesNotExist:
             return None
+
+    def get_new_documents_count(self, obj):
+        try:
+            profile = obj.patientprofile
+            # Logic for "new" documents: e.g., created in the last 7 days and not seen (if we had a seen status)
+            # For now, let's just count documents from the last 7 days
+            week_ago = timezone.now() - timezone.timedelta(days=7)
+            return MedicalDocument.objects.filter(patient=profile, created_at__gte=week_ago).count()
+        except PatientProfile.DoesNotExist:
+            return 0
 
     def get_recent_notifications(self, obj):
         notifications = Notification.objects.filter(user=obj).order_by('-date')[:5]
