@@ -6,8 +6,8 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate, login, logout
 from django.db import transaction
 from datetime import datetime
-
-from .models import User, PatientProfile, DoctorProfile, MedicalDocument, Appointment
+from django.utils import timezone
+from .models import User, PatientProfile, DoctorProfile, MedicalDocument, Appointment, Notification
 from .serializers import (
     UserSerializer, PatientProfileSerializer, DoctorProfileSerializer,
     RegisterPatientSerializer, LoginSerializer, PatientDashboardSerializer,
@@ -250,6 +250,47 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         headers = self.get_success_headers(read_serializer.data)
         return Response(read_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
+    @action(detail=True, methods=['post'], url_path='cancel')
+    def cancel(self, request, pk=None):
+        appointment = self.get_object()
+        
+        # Validation: Déjà annulé ou terminé
+        if appointment.status in ['CANCELLED', 'COMPLETED', 'REJECTED']:
+            return Response(
+                {"error": "Ce rendez-vous ne peut plus être annulé."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validation: 24h avant
+        # On compare avec l'heure actuelle (timezone aware)
+        now = timezone.now()  # <-- timezone est maintenant importé
+        
+        # Calcul de la différence
+        time_diff = appointment.date - now
+        
+        # Si moins de 24h (et pas de raison d'urgence, mais on simplifie ici)
+        if time_diff.total_seconds() < 24 * 3600:
+            return Response(
+                {"error": "L'annulation doit se faire au moins 24h à l'avance."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        with transaction.atomic():
+            appointment.status = 'CANCELLED'
+            appointment.notes_patient = "Annulé par le patient"
+            appointment.save()
+            
+            # Notification au médecin
+            Notification.objects.create(  # <-- Notification est maintenant importé
+                user=appointment.doctor.user,
+                title="Annulation de rendez-vous",
+                message=f"Le patient {appointment.patient.user.get_full_name()} a annulé son rendez-vous du {appointment.date.strftime('%d/%m/%Y à %H:%M')}.",
+                type='APPOINTMENT',
+                date=timezone.now()
+            )
+            
+        return Response(AppointmentSerializer(appointment).data)
+        
 class MedicalDocumentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = MedicalDocumentSerializer

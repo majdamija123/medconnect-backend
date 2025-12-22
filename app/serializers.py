@@ -3,6 +3,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from .models import User, PatientProfile, DoctorProfile, Appointment, Notification, MedicalDocument
 from django.utils import timezone
+from datetime import datetime
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
