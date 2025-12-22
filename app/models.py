@@ -46,7 +46,6 @@ class DoctorProfile(models.Model):
     consultation_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_available = models.BooleanField(default=True)
     bio = models.TextField(blank=True, null=True)
-    
     def __str__(self):
         return f"Dr. {self.user.get_full_name()} - {self.speciality}"
 

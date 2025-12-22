@@ -11,7 +11,7 @@ from .models import User, PatientProfile, DoctorProfile, MedicalDocument
 from .serializers import (
     UserSerializer, PatientProfileSerializer, DoctorProfileSerializer,
     RegisterPatientSerializer, LoginSerializer, PatientDashboardSerializer,
-    MedicalDocumentSerializer
+    MedicalDocumentSerializer, RegisterDoctorSerializer
 )
 from .permissions import IsAgentOrSuperAdmin
 
@@ -49,6 +49,36 @@ class AuthViewSet(viewsets.GenericViewSet):
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    @action(detail=False, methods=['post'], url_path='register/doctor')
+    def register_doctor(self, request):
+        """Inscription d'un nouveau médecin"""
+        serializer = RegisterDoctorSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                with transaction.atomic():
+                    doctor_profile = serializer.save()
+                    
+                    # Créer un token pour l'utilisateur
+                    token, created = Token.objects.get_or_create(user=doctor_profile.user)
+                    
+                    # Préparer la réponse
+                    response_data = {
+                        'token': token.key,
+                        'user': UserSerializer(doctor_profile.user).data,
+                        'doctor_profile': DoctorProfileSerializer(doctor_profile).data,
+                        'message': 'Inscription médecin réussie'
+                    }
+                    
+                    return Response(response_data, status=status.HTTP_201_CREATED)
+                    
+            except Exception as e:
+                return Response(
+                    {'error': str(e)}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     @action(detail=False, methods=['post'], url_path='login')
     def user_login(self, request):
         """Connexion d'un utilisateur"""

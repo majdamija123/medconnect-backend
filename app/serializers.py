@@ -121,6 +121,75 @@ class RegisterPatientSerializer(serializers.Serializer):
         
         return patient_profile
 
+class RegisterDoctorSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150, required=True)
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(write_only=True, required=True)
+    first_name = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    license_number = serializers.CharField(max_length=50, required=True)
+    specialty = serializers.CharField(required=True)
+    address = serializers.CharField(required=False, allow_blank=True)
+    bio = serializers.CharField(required=False, allow_blank=True)
+    consultation_fee = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=0)
+
+    def validate_password(self, value):
+        validate_password(value)
+        return value
+
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Cet email est déjà utilisé.")
+        return value
+
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("Ce nom d'utilisateur est déjà pris.")
+        return value
+        
+    def validate_license_number(self, value):
+        if DoctorProfile.objects.filter(license_number=value).exists():
+            raise serializers.ValidationError("Ce numéro de licence est déjà utilisé.")
+        return value
+
+    def create(self, validated_data):
+        # Extraire les données du médecin
+        license_number = validated_data.pop('license_number')
+        specialty_name = validated_data.pop('specialty')
+        address = validated_data.pop('address', '')
+        bio = validated_data.pop('bio', '')
+        consultation_fee = validated_data.pop('consultation_fee', 0)
+        
+        # Créer l'utilisateur
+        password = validated_data.pop('password')
+        user = User.objects.create(
+            **validated_data,
+            address=address,
+            role=User.Roles.DOCTOR,
+            is_active=True
+        )
+        user.set_password(password)
+        user.save()
+        
+        # Gérer la spécialité (Get or Create)
+        from .models import Speciality
+        speciality_obj, _ = Speciality.objects.get_or_create(
+            name=specialty_name,
+            defaults={'description': f'Spécialité : {specialty_name}'}
+        )
+
+        # Créer le profil médecin
+        doctor_profile = DoctorProfile.objects.create(
+            user=user,
+            speciality=speciality_obj,
+            license_number=license_number,
+            bio=bio,
+            consultation_fee=consultation_fee
+        )
+        
+        return doctor_profile
+
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
     password = serializers.CharField(write_only=True, required=True)
