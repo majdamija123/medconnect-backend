@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     AuthViewSet, UserAdminViewSet, PatientViewSet, AppointmentViewSet,
     PatientDashboardView, DoctorViewSet, PatientProfileView, MedicalDocumentViewSet,
-    MedicalRecordViewSet, PatientMedicalRecordView
+    MedicalRecordViewSet, PatientMedicalRecordView, DoctorDashboardAPIView,
 )
 
 router = DefaultRouter()
@@ -23,6 +23,9 @@ urlpatterns = [
     path('api/patient/dashboard/', PatientDashboardView.as_view(), name='patient-dashboard'),
     path('api/patient/profile/', PatientProfileView.as_view(), name='patient-profile'),
     path('api/patient/medical-record/', PatientMedicalRecordView.as_view(), name='patient-medical-record'),
+
+    # ✅ Route Dashboard Médecin
+    path('api/doctor/dashboard/', DoctorDashboardAPIView.as_view(), name='doctor-dashboard'),
 
     # Auth DRF Browsable API
     path('api-auth/', include('rest_framework.urls')),

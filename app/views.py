@@ -224,6 +224,95 @@ class DoctorViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
+# ✅ Doctor Dashboard
+class DoctorDashboardAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if not user.is_doctor():
+            return Response({"error": "Accès réservé aux médecins"}, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            doctor = user.doctorprofile
+        except DoctorProfile.DoesNotExist:
+             return Response({"error": "Profil médecin introuvable"}, status=status.HTTP_404_NOT_FOUND)
+
+        now = timezone.now()
+        today = now.date()
+
+        # Stats
+        patients_seen_count = Appointment.objects.filter(doctor=doctor).values('patient').distinct().count()
+        upcoming_appointments_count = Appointment.objects.filter(
+            doctor=doctor, 
+            status__in=['PENDING', 'CONFIRMED'], 
+            date__gte=now
+        ).count()
+        unread_messages_count = 0 # Placeholder
+
+        # Today's Appointments
+        today_appts_qs = Appointment.objects.filter(
+            doctor=doctor, 
+            date__date=today
+        ).select_related('patient__user').order_by('date')
+        
+        today_appointments = []
+        for appt in today_appts_qs:
+            today_appointments.append({
+                "id": appt.id,
+                "doctor_name": appt.patient.user.get_full_name(), # Mapped to Patient Name for frontend reuse
+                "specialty": appt.reason or "Consultation",       # Mapped to Type/Reason
+                "date": appt.date.isoformat(),
+                "status": appt.status
+            })
+
+        # Notifications (Generated from recent activity)
+        # On prend les 5 derniers RDV modifiés ou créés
+        recent_appts = Appointment.objects.filter(doctor=doctor).order_by('-id')[:5]
+        recent_notifications = []
+        
+        for appt in recent_appts:
+            notif_title = "Mise à jour RDV"
+            notif_msg = f"RDV avec {appt.patient.user.get_full_name()}"
+            notif_type = "INFO"
+            
+            if appt.status == 'PENDING':
+                notif_title = "Nouveau RDV"
+                notif_msg = f"Demande de {appt.patient.user.get_full_name()}"
+            elif appt.status == 'CANCELLED':
+                notif_title = "RDV Annulé"
+                notif_type = "WARNING"
+            elif appt.status == 'REFUSED':
+                notif_title = "RDV Refusé"
+                notif_type = "WARNING"
+            elif appt.status == 'CONFIRMED':
+                notif_title = "RDV Confirmé"
+                notif_type = "SUCCESS"
+
+            recent_notifications.append({
+                "id": appt.id,
+                "title": notif_title,
+                "message": notif_msg,
+                "date": appt.date.isoformat(),
+                "type": notif_type
+            })
+
+        data = {
+            "doctor_profile": {
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "specialty": doctor.speciality.name if doctor.speciality else "Généraliste"
+            },
+            "patients_seen_count": patients_seen_count,
+            "upcoming_appointments_count": upcoming_appointments_count,
+            "unread_messages_count": unread_messages_count,
+            "today_appointments": today_appointments,
+            "recent_notifications": recent_notifications
+        }
+        
+        return Response(data)
+
+
 # ✅ Pagination
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 10
